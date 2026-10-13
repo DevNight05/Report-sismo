@@ -1,0 +1,1090 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15100c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sismos Panamá">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Sismos Panamá</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* Diseño: barra lateral con secciones en escritorio; en teléfono pasa a una franja de pestañas fija arriba. Una columna de contenido. */
+:root{
+  --bg:#faf5f0; --surface:#ffffff; --surface-2:#f4e9de; --line:#e4d4c4;
+  --fg:#2a1a10; --fg-dim:#6e5a4a;
+  --sea:#efe5db; --land:#dccdbd; --land-line:#b39a82;
+  --accent:#c2410c; --on-accent:#ffffff;
+  --m-low:#2a9d8f; --m-mid:#d99a00; --m-high:#e5601f; --m-major:#c8102e;
+  --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15100c; --surface:#201812; --surface-2:#2c2118; --line:#42332a;
+    --fg:#f5ede6; --fg-dim:#b5a090;
+    --sea:#100c09; --land:#2a2019; --land-line:#4d3b2d;
+    --accent:#ff8a3d; --on-accent:#2b1203;
+    --m-low:#3fc1b0; --m-mid:#f2b632; --m-high:#ff7a3d; --m-major:#ff3b57;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15100c; --surface:#201812; --surface-2:#2c2118; --line:#42332a;
+  --fg:#f5ede6; --fg-dim:#b5a090;
+  --sea:#100c09; --land:#2a2019; --land-line:#4d3b2d;
+  --accent:#ff8a3d; --on-accent:#2b1203;
+  --m-low:#3fc1b0; --m-mid:#f2b632; --m-high:#ff7a3d; --m-major:#ff3b57;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font-body);
+  padding-inline:16px;padding-block:calc(10px + env(safe-area-inset-top,0px)) calc(32px + env(safe-area-inset-bottom,0px))}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:34px;line-height:1}
+h2{font-size:22px;line-height:1.1}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.14em;color:var(--fg-dim);font-weight:600}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+.hint{font-size:13px;color:var(--fg-dim);margin:0}
+[hidden]{display:none!important}
+
+.app{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:0 28px}
+@media(min-width:900px){.app{grid-template-columns:210px minmax(0,1fr)}}
+
+/* navegación */
+nav.rail{position:sticky;top:0;z-index:40;background:var(--bg);margin-inline:-16px;padding:8px 16px;padding-top:calc(8px + env(safe-area-inset-top,0px));margin-top:calc(-10px - env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
+nav.rail .brand{display:none}
+nav.rail ul{list-style:none;margin:0;padding:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+nav.rail ul::-webkit-scrollbar{display:none}
+nav.rail a{display:block;white-space:nowrap;text-decoration:none;color:var(--fg-dim);font-weight:500;padding:8px 12px;border-radius:8px;min-height:40px}
+nav.rail a[aria-current="true"]{background:var(--surface-2);color:var(--fg)}
+@media(min-width:900px){
+  nav.rail{top:0;align-self:start;height:100vh;margin:0;margin-left:-16px;padding:24px 16px;border:0;border-right:1px solid var(--line);background:transparent}
+  nav.rail .brand{display:block;font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1;margin-bottom:20px}
+  nav.rail .brand small{display:block;font-family:var(--font-body);font-weight:400;font-size:12px;color:var(--fg-dim);margin-top:6px}
+  nav.rail ul{flex-direction:column;overflow:visible}
+}
+main{display:flex;flex-direction:column;gap:20px;padding-top:16px;min-width:0}
+section{display:flex;flex-direction:column;gap:12px;min-width:0;scroll-margin-top:64px}
+@media(min-width:900px){section{scroll-margin-top:16px}}
+
+.topline{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.clock{font-size:13px;color:var(--fg-dim)}
+.clock b{color:var(--fg);font-weight:500}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-dim);min-width:0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--fg-dim);flex:none}
+.dot.live{background:var(--m-low);animation:beat 2s infinite}
+.dot.off{background:var(--m-mid)}
+@keyframes beat{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--m-low) 55%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn-main{flex:1 1 210px;min-height:52px;border:0;border-radius:8px;background:var(--accent);color:var(--on-accent);font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:.03em;padding:10px 16px}
+.btn-main[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);outline:2px solid var(--accent);outline-offset:-2px}
+.btn-sec{min-height:44px;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:8px 14px;font-weight:500}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:center}
+.opts label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--fg-dim)}
+.opts select{min-height:46px;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:8px 10px;width:100%;font-size:16px}
+.check{flex-direction:row!important;align-items:center;gap:10px!important;font-size:15px!important;color:var(--fg)!important}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+
+.counters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(min-width:640px){.counters{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.counter{background:var(--surface-2);border-radius:8px;padding:10px 12px;min-width:0}
+.counter .n{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;overflow-wrap:anywhere}
+.counter .l{font-size:12px;color:var(--fg-dim);margin-top:4px}
+
+.focus{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:start}
+.bigmag{font-family:var(--font-display);font-weight:700;font-size:72px;line-height:.9}
+.focus .t{font-weight:600;font-size:17px;overflow-wrap:anywhere}
+.focus dl{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 16px;margin:6px 0 0}
+.focus dt{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg-dim)}
+.focus dd{margin:0;font-size:14px;overflow-wrap:anywhere}
+.focus .links{grid-column:1/-1;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+.bands{display:flex;flex-direction:column;gap:8px}
+.band{display:grid;grid-template-columns:96px 1fr 38px;gap:10px;align-items:center;font-size:13px}
+.band .bar{height:10px;border-radius:5px;background:var(--surface-2);overflow:hidden}
+.band .bar span{display:block;height:100%;border-radius:5px}
+.band .c{text-align:right}
+.days{display:flex;gap:6px;align-items:flex-end;height:120px;padding-top:6px}
+.day{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+.day .col{width:100%;max-width:44px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.day .v{font-size:11px;font-family:var(--font-mono)}
+.day .d{font-size:11px;color:var(--fg-dim);white-space:nowrap}
+.two{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media(min-width:760px){.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+
+/* mapa */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:transparent;padding:8px 12px;font-size:13px;min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+.toolbar{display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--fg-dim)}
+.filters select{min-height:40px;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:6px 8px;width:100%}
+.layers{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:14px}
+.layers label{display:flex;gap:8px;align-items:center}
+.layers input{width:18px;height:18px;accent-color:var(--accent)}
+.mapbox{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--sea)}
+#map{height:min(70vh,560px);min-height:340px;width:100%;background:var(--sea)}
+.mapbox.full{position:fixed;inset:0;z-index:900;border-radius:0;border:0}
+.mapbox.full #map{height:100vh;height:100dvh}
+.fsbtn{position:absolute;top:10px;right:10px;z-index:500;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.mapbox.full .fsbtn{top:calc(10px + env(safe-area-inset-top,0px))}
+.leaflet-container{background:var(--sea);font-family:var(--font-body)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--fg-dim)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pick{min-height:44px;font-size:14px;color:var(--fg-dim);background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.pick b{color:var(--fg)}
+.mainpin{width:44px;height:44px;border-radius:50%;background:var(--m-major);color:#fff;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:19px;box-shadow:0 0 0 6px color-mix(in srgb,var(--m-major) 35%,transparent)}
+.pulsepin span{display:block;width:30px;height:30px;margin:-15px 0 0 -15px;border:3px solid;border-radius:50%;animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{transform:scale(.5);opacity:.95}100%{transform:scale(2.2);opacity:0}}
+.townlbl{background:transparent;border:0;box-shadow:none;color:var(--fg);font-size:11px;font-weight:500;padding:0;text-shadow:0 0 3px var(--bg),0 0 3px var(--bg)}
+.townlbl:before{display:none}
+
+/* lista */
+.list{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;padding:10px 0;border:0;border-top:1px solid var(--line);min-width:0;background:none;text-align:left;width:100%}
+.row:first-child{border-top:0}
+.row .m{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1}
+.row .p{min-width:0}
+.row .p b{display:block;font-weight:600;overflow-wrap:anywhere}
+.row .p span{font-size:12px;color:var(--fg-dim)}
+
+/* guías */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.step{background:var(--surface-2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.step h3{color:var(--accent)}
+.step ul,.guide ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.guide{background:var(--surface-2);border-radius:8px;padding:12px}
+.checks{display:flex;flex-direction:column;gap:8px}
+.checks label{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:var(--surface-2);border-radius:8px}
+.checks input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+.bar-prog{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.bar-prog span{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.src{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.src div{background:var(--surface-2);border-radius:8px;padding:12px;font-size:14px}
+.src b{display:block;margin-bottom:2px}
+.emerg{font-family:var(--font-display);font-weight:700;font-size:44px;line-height:1;color:var(--m-major)}
+footer p{font-size:12px;color:var(--fg-dim);margin:0 0 6px}
+
+#banner{position:fixed;left:0;right:0;top:0;z-index:1000;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 16px;
+  background:var(--m-high);color:#fff;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+#banner.major{background:var(--m-major)}
+#banner.low{background:var(--m-low);color:#06201c}
+#banner .bm{font-family:var(--font-display);font-weight:700;font-size:64px;line-height:.9}
+#banner .bt{flex:1;min-width:0}
+#banner .bt b{display:block;font-family:var(--font-display);font-size:26px;line-height:1.05;overflow-wrap:anywhere}
+#banner .bt span{font-size:13px;opacity:.9}
+#banner .bt em{display:block;font-style:normal;font-weight:600;font-size:15px;margin-top:6px}
+#banner button{border:2px solid currentColor;background:transparent;border-radius:8px;padding:8px 14px;min-height:44px;font-weight:600}
+@media(prefers-reduced-motion:reduce){.pulsepin span,.dot.live{animation:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div id="banner" role="alert" hidden>
+  <div class="bm mono" id="bMag"></div>
+  <div class="bt"><b id="bPlace"></b><span id="bInfo"></span><em id="bCalm"></em></div>
+  <button id="bClose" type="button">Cerrar</button>
+</div>
+
+<div class="app">
+  <nav class="rail" aria-label="Secciones">
+    <div class="brand">Sismos Panamá<small>Terremoto de Tonosí, 9 oct 2026</small></div>
+    <ul>
+      <li><a href="#panel" data-sec="panel">Panel general</a></li>
+      <li><a href="#mapa" data-sec="mapa">Mapa sísmico</a></li>
+      <li><a href="#eventos" data-sec="eventos">Últimos eventos</a></li>
+      <li><a href="#quehacer" data-sec="quehacer">Qué hacer ahora</a></li>
+      <li><a href="#fuentes" data-sec="fuentes">Fuentes</a></li>
+      <li><a href="#preparacion" data-sec="preparacion">Preparación</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section id="panel" aria-labelledby="hPanel">
+      <div class="topline">
+        <div class="clock mono">Hora de Panamá (UTC−5) <b id="clock">–</b></div>
+        <div class="status"><span class="dot" id="dot"></span><span id="statusTxt">Conectando con USGS y EMSC…</span></div>
+      </div>
+      <h1 id="hPanel">Sismo en Panamá</h1>
+      <p class="hint">Seguimiento del terremoto de Tonosí del 9 de octubre de 2026 y de todos los sismos que han ocurrido desde entonces. La página no predice sismos: avisa pocos minutos después de que una red sismológica registra uno.</p>
+
+      <div class="panel">
+        <div class="actions">
+          <button class="btn-main" id="arm" type="button" aria-pressed="false">Activar alertas y voz</button>
+          <button class="btn-sec" id="test" type="button">Probar alerta</button>
+          <button class="btn-sec" id="share" type="button">Difundir</button>
+          <button class="btn-sec" id="install" type="button">Instalar app</button>
+          <button class="btn-sec" id="refresh" type="button">Actualizar datos</button>
+        </div>
+        <div class="opts">
+          <label for="thr"><span>Avisar desde magnitud</span>
+            <select id="thr">
+              <option value="2.5">2.5 · Todos los sismos</option>
+              <option value="3.0">3.0 · Leves</option>
+              <option value="3.5">3.5</option>
+              <option value="4.0">4.0 · Moderados</option>
+              <option value="4.5">4.5</option>
+              <option value="5.0">5.0 · Fuertes</option>
+              <option value="5.5">5.5</option>
+              <option value="6.0">6.0 · Muy fuertes</option>
+              <option value="7.0">7.0 · Mayores</option>
+            </select></label>
+          <label class="check" for="voice"><input id="voice" type="checkbox" checked> Decir el sismo en voz alta</label>
+          <label class="check" for="onlyPA"><input id="onlyPA" type="checkbox" checked> Solo Panamá</label>
+        </div>
+        <p class="hint" id="installHint" hidden></p>
+        <p class="hint">Actívalas una sola vez: tu magnitud, la voz y el filtro quedan guardados en este teléfono y se recuperan solos cada vez que entras. Los sismos llegan en tiempo real (EMSC) y el USGS se consulta cada 15 segundos.</p>
+        <p class="hint" id="pushHint"></p>
+      </div>
+
+      <div class="counters">
+        <div class="counter"><div class="n mono" id="cEvents">–</div><div class="l">eventos registrados desde el 9 de octubre</div></div>
+        <div class="counter"><div class="n mono" id="cMaxM">–</div><div class="l">mayor magnitud registrada</div></div>
+        <div class="counter"><div class="n mono" id="cLast">–</div><div class="l" id="cLastL">evento más reciente</div></div>
+        <div class="counter"><div class="n mono" id="cAfter">–</div><div class="l">réplicas del sismo principal</div></div>
+        <div class="counter"><div class="n mono" id="c24">–</div><div class="l">eventos en las últimas 24 h</div></div>
+      </div>
+
+      <div class="panel" aria-live="polite">
+        <h3>En foco</h3>
+        <div class="focus" id="focus"></div>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <h3>Réplicas por tamaño</h3>
+          <div class="bands" id="bands"></div>
+          <p class="hint" id="rate"></p>
+        </div>
+        <div class="panel">
+          <h3>Réplicas por día (hora de Panamá)</h3>
+          <div class="days" id="days"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="mapa" aria-labelledby="hMap">
+      <h2 id="hMap">Mapa sísmico</h2>
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Capa base">
+          <button type="button" data-base="auto" aria-pressed="true">Mapa</button>
+          <button type="button" data-base="osm" aria-pressed="false">Calle</button>
+          <button type="button" data-base="sat" aria-pressed="false">Satélite</button>
+          <button type="button" data-base="vec" aria-pressed="false">Esquema</button>
+        </div>
+        <div class="seg" role="group" aria-label="Vista">
+          <button type="button" id="vAll" aria-pressed="true">Todo Panamá</button>
+          <button type="button" id="vZone" aria-pressed="false">Zona del sismo</button>
+        </div>
+      </div>
+      <div class="filters">
+        <label for="fMag">Magnitud
+          <select id="fMag">
+            <option value="0">Todas</option>
+            <option value="3">3.0+ · Sentidos</option>
+            <option value="4">4.0+</option>
+            <option value="5">5.0+ · Fuertes</option>
+            <option value="6">6.0+</option>
+            <option value="7">7.0+</option>
+          </select></label>
+        <label for="fPer">Período
+          <select id="fPer">
+            <option value="all">Todo el evento</option>
+            <option value="24">Últimas 24 h</option>
+            <option value="6">Últimas 6 h</option>
+          </select></label>
+        <label for="fProv">Provincia (aprox.)<select id="fProv"><option value="all">Todas</option></select></label>
+        <label for="fTown">Ciudad más cercana<select id="fTown"><option value="all">Todas</option></select></label>
+      </div>
+      <div class="layers">
+        <label for="lZone"><input type="checkbox" id="lZone"> Zona de réplicas (200 km)</label>
+        <label for="lTowns"><input type="checkbox" id="lTowns"> Ciudades</label>
+      </div>
+      <div class="mapbox" id="mapbox">
+        <div id="map" role="application" aria-label="Mapa de sismos en Panamá"></div>
+        <button class="fsbtn" id="fs" type="button">Pantalla completa</button>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--m-low)"></i>menor a 3.5</span>
+        <span><i style="background:var(--m-mid)"></i>3.5 – 4.9</span>
+        <span><i style="background:var(--m-high)"></i>5.0 – 5.9</span>
+        <span><i style="background:var(--m-major)"></i>6.0 o más</span>
+        <span>Más opaco = más reciente</span>
+        <span id="mapCount"></span>
+      </div>
+      <div class="pick" id="pick">Toca un punto del mapa o un evento de la lista para ver el detalle.</div>
+    </section>
+
+    <section id="eventos" aria-labelledby="hEv">
+      <h2 id="hEv">Últimos eventos</h2>
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Orden">
+          <button type="button" id="sRecent" aria-pressed="true">Recientes</button>
+          <button type="button" id="sMag" aria-pressed="false">Mayor magnitud</button>
+        </div>
+        <span class="hint" id="evCount"></span>
+      </div>
+      <div class="panel"><div class="list" id="list"></div>
+        <button class="btn-sec" id="more" type="button">Ver más</button></div>
+    </section>
+
+    <section id="quehacer" aria-labelledby="hQue">
+      <h2 id="hQue">Qué hacer ahora</h2>
+      <div class="steps">
+        <div class="step"><h3>Durante el temblor</h3><ul>
+          <li>Agáchate, cúbrete la cabeza y el cuello y sujétate de algo firme hasta que pare.</li>
+          <li>Aléjate de ventanas, espejos y muebles que puedan caer.</li>
+          <li>No corras a la salida ni uses ascensores.</li></ul></div>
+        <div class="step"><h3>Justo después</h3><ul>
+          <li>Revisa si hay heridos. No muevas a quien tenga una lesión grave.</li>
+          <li>Si huele a gas, abre ventanas, cierra la llave y sal sin encender nada.</li>
+          <li>Si el edificio tiene daños, sal con calzado y ve a un espacio abierto.</li>
+          <li>Usa mensajes de texto para no saturar las llamadas.</li></ul></div>
+        <div class="step"><h3>Próximas horas</h3><ul>
+          <li>Espera réplicas y repite agacharte y cubrirte cada vez.</li>
+          <li>No regreses a construcciones dañadas.</li>
+          <li>Ten a mano linterna, agua y documentos.</li>
+          <li>Infórmate solo en fuentes oficiales; no compartas rumores.</li></ul></div>
+      </div>
+      <div class="panel">
+        <h3>Según dónde estés</h3>
+        <div class="seg" role="group" aria-label="Lugar" id="placeTabs">
+          <button type="button" data-p="casa" aria-pressed="true">Casa</button>
+          <button type="button" data-p="calle" aria-pressed="false">Calle</button>
+          <button type="button" data-p="vehiculo" aria-pressed="false">Vehículo</button>
+          <button type="button" data-p="costa" aria-pressed="false">Costa</button>
+          <button type="button" data-p="ninos" aria-pressed="false">Niños y mayores</button>
+        </div>
+        <div class="guide" id="guide"></div>
+      </div>
+      <p class="hint">Esta página no sustituye los avisos oficiales de SINAPROC. En una emergencia llama al 911.</p>
+    </section>
+
+    <section id="fuentes" aria-labelledby="hSrc">
+      <h2 id="hSrc">Fuentes</h2>
+      <div class="src">
+        <div><b>USGS</b>Servicio Geológico de Estados Unidos. Se consulta cada 15 segundos, con todas las magnitudes que publica. <a href="https://earthquake.usgs.gov/earthquakes/map/" target="_blank" rel="noopener">Mapa del USGS</a></div>
+        <div><b>EMSC</b>Centro Sismológico Euro-Mediterráneo. Envía cada sismo nuevo en tiempo real. <a href="https://www.seismicportal.eu/" target="_blank" rel="noopener">seismicportal.eu</a></div>
+        <div><b>Instituto de Geociencias (IGC-UP)</b>Red sismológica nacional de la Universidad de Panamá. No ofrece un servicio de datos abierto que esta página pueda leer; consulta su sitio. <a href="https://igc.up.ac.pa/" target="_blank" rel="noopener">igc.up.ac.pa</a></div>
+        <div><b>GFZ GEOFON</b>Red alemana de referencia para contrastar magnitudes. <a href="https://geofon.gfz-potsdam.de/" target="_blank" rel="noopener">geofon.gfz-potsdam.de</a></div>
+        <div><b>SINAPROC</b>Avisos y órdenes oficiales de protección civil. <a href="https://www.sinaproc.gob.pa/" target="_blank" rel="noopener">sinaproc.gob.pa</a></div>
+        <div><b>Alertas de tsunami</b>Centro de Alerta de Tsunamis de EE. UU. (NOAA). <a href="https://www.tsunami.gov/" target="_blank" rel="noopener">tsunami.gov</a></div>
+      </div>
+      <p class="hint">Cuando USGS y EMSC reportan el mismo sismo se muestra una sola vez, con los datos del USGS. El sismo principal figura en M 7.7 (USGS; su primer dato fue 8.0 y se corrigió). El IGC-UP publicó estimaciones preliminares distintas. Los valores pueden cambiar al revisarse. La página incluye una copia de los 70 sismos que el USGS registró del 9 al 12 de octubre (hasta las 6:36 p. m., hora de Panamá) para no quedar vacía si no hay conexión.</p>
+      <p class="hint">Mapas: © OpenStreetMap, © CARTO, Esri y sus proveedores. Provincia y ciudad se calculan con el poblado más cercano, por eso son aproximadas.</p>
+    </section>
+
+    <section id="preparacion" aria-labelledby="hPrep">
+      <h2 id="hPrep">Preparación</h2>
+      <div class="panel">
+        <div class="mono hint" id="prog">0 de 6 listas</div>
+        <div class="bar-prog"><span id="progBar"></span></div>
+        <div class="checks" id="checks"></div>
+        <p class="hint">Tu avance se guarda en este teléfono.</p>
+      </div>
+      <div class="panel">
+        <h3>Emergencias</h3>
+        <div class="emerg mono">911</div>
+        <p class="hint">Número único de emergencias en Panamá.</p>
+      </div>
+    </section>
+
+    <footer>
+      <p>Información de referencia. En caso de duda sigue siempre las instrucciones de SINAPROC y de las autoridades locales.</p>
+    </footer>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+'use strict';
+var TZ='America/Panama';
+var START='2026-10-09T00:00:00';          // incluye cualquier sismo previo al principal (12:56 hora de Panamá, 9 oct)
+var BOX={minlat:5.5,maxlat:10.5,minlon:-84.5,maxlon:-76};
+var API='https://earthquake.usgs.gov/fdsnws/event/1/query';
+var EMSC_Q='https://www.seismicportal.eu/fdsnws/event/1/query';
+var EMSC_WS='wss://www.seismicportal.eu/standing_order/websocket';
+var POLL_MS=15000;
+var PUSH_URL='';   /* ← pega aquí la dirección de tu servidor de avisos (ver LEEME.md) para recibir avisos con la app cerrada */
+var VAPID_PUB='BAtbODiPMVW_AePwbq8-owUFbQISOZRmXip6kP87K-tgOq7HmT2lRZvpzAuI3f4bvMwJj-sAE7MrTQCiHWu6ZBY';
+var BOUNDS_ALL=[[5.9,-83.7],[10.1,-76.6]],BOUNDS_ZONE=[[6.4,-82.3],[8.9,-78.8]];
+var REF_MAIN={id:'ref-tonosi',mag:7.7,lat:7.5868,lon:-80.769,depth:12.6,time:Date.parse('2026-10-09T17:56:06Z'),place:'12 km WSW of Pitaloza Arriba, Panama',ids:{},srcs:{}};
+
+/* ---------- utilidades ---------- */
+function $(id){return document.getElementById(id)}
+function lsGet(k,d){try{var v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+var fmtFull=new Intl.DateTimeFormat('es-PA',{timeZone:TZ,day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true});
+var fmtHour=new Intl.DateTimeFormat('es-PA',{timeZone:TZ,hour:'numeric',minute:'2-digit',hour12:true});
+var fmtClock=new Intl.DateTimeFormat('es-PA',{timeZone:TZ,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+var fmtDay=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+var fmtDayShort=new Intl.DateTimeFormat('es-PA',{timeZone:TZ,day:'numeric',month:'short'});
+function ago(ms){
+  var s=Math.max(0,Math.round(ms/1000));
+  if(s<90)return 'hace '+s+' s';
+  var m=Math.round(s/60); if(m<90)return 'hace '+m+' min';
+  var h=Math.floor(m/60); if(h<48)return 'hace '+h+' h '+(m%60)+' min';
+  var d=Math.floor(h/24); return 'hace '+d+' días '+(h%24)+' h';
+}
+function km(a,b){
+  var R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lon)*r;
+  var x=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+function cv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function magVar(m){return m>=6?'--m-major':m>=5?'--m-high':m>=3.5?'--m-mid':'--m-low'}
+function magColor(m){return 'var('+magVar(m)+')'}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fmtMag(m){return (Math.round(m*10)/10).toFixed(1)}
+/* "12 km SW of Tonosí, Panama" -> {long:"12 km al SO de Tonosí", short:"Tonosí"} */
+function parsePlace(raw){
+  if(!raw)return {long:'Panamá',short:'Panamá'};
+  var s=String(raw),dir='',dist='',rest=s;
+  var m=s.match(/^(\d+)\s*km\s+([NSEW]{1,3})\s+of\s+(.+)$/i);
+  if(m){dist=m[1];dir=m[2].toUpperCase().replace(/W/g,'O');rest=m[3];}
+  var parts=rest.split(',');
+  var town=parts[0].trim();
+  var country=parts.length>1?parts[parts.length-1].trim():'';
+  var cEs=country==='Panama'?'Panamá':country;
+  var tEs=town.replace(/\bPanama\b/g,'Panamá').replace(/\bborder region\b/i,'región fronteriza').replace(/\bPacific Ocean\b/i,'océano Pacífico').replace(/\bCaribbean Sea\b/i,'mar Caribe').replace(/\bsouth of\b/i,'al sur de').replace(/\bnorth of\b/i,'al norte de');
+  var extra=cEs&&cEs!=='Panamá'?', '+cEs:'';
+  return {long:(dist?dist+' km al '+dir+' de ':'')+tEs+extra,short:tEs+extra};
+}
+
+/* ---------- poblados de referencia: nombre, lat, lon, país, provincia ---------- */
+var TOWNS=[['Tonosí',7.41,-80.44,'Panama','Los Santos'],['Pedasí',7.53,-80.03,'Panama','Los Santos'],['Las Tablas',7.77,-80.28,'Panama','Los Santos'],['Macaracas',7.74,-80.56,'Panama','Los Santos'],['Chitré',7.96,-80.43,'Panama','Herrera'],['Ocú',7.94,-80.78,'Panama','Herrera'],['Mariato',7.45,-80.95,'Panama','Veraguas'],['Soná',8.0,-81.31,'Panama','Veraguas'],['Santiago',8.1,-80.98,'Panama','Veraguas'],['Aguadulce',8.24,-80.55,'Panama','Coclé'],['Antón',8.4,-80.27,'Panama','Coclé'],['Penonomé',8.52,-80.36,'Panama','Coclé'],['David',8.43,-82.43,'Panama','Chiriquí'],['Puerto Armuelles',8.28,-82.87,'Panama','Chiriquí'],['Boquete',8.78,-82.44,'Panama','Chiriquí'],['Volcán',8.77,-82.63,'Panama','Chiriquí'],['Almirante',9.3,-82.4,'Panama','Bocas del Toro'],['Changuinola',9.43,-82.52,'Panama','Bocas del Toro'],['Bocas del Toro',9.34,-82.24,'Panama','Bocas del Toro'],['Chame',8.59,-79.88,'Panama','Panamá Oeste'],['La Chorrera',8.88,-79.78,'Panama','Panamá Oeste'],['Arraiján',8.95,-79.66,'Panama','Panamá Oeste'],['Panamá',8.98,-79.52,'Panama','Panamá'],['Chepo',9.17,-79.1,'Panama','Panamá'],['Colón',9.36,-79.9,'Panama','Colón'],['Portobelo',9.55,-79.65,'Panama','Colón'],['Donoso',8.92,-80.67,'Panama','Colón'],['La Palma',8.4,-78.15,'Panama','Darién'],['Metetí',8.5,-77.98,'Panama','Darién'],['Yaviza',8.15,-77.69,'Panama','Darién'],['Jaqué',7.52,-78.17,'Panama','Darién'],['Garachiné',8.07,-78.37,'Panama','Darién'],['Puerto Obaldía',8.67,-77.42,'Panama','Guna Yala'],['El Porvenir',9.56,-78.95,'Panama','Guna Yala'],['Llano Tugrí',8.55,-81.78,'Panama','Comarca Ngäbe-Buglé'],['Unión Chocó',8.1,-77.88,'Panama','Comarca Emberá-Wounaan'],['Paso Canoas',8.53,-82.84,'Costa Rica','Costa Rica'],['Golfito',8.64,-83.17,'Costa Rica','Costa Rica']];
+function nearestTown(la,lo){
+  var best=null,bd=1e9,pt={lat:la,lon:lo};
+  TOWNS.forEach(function(t){var d=km(pt,{lat:t[1],lon:t[2]});if(d<bd){bd=d;best=t}});
+  return {t:best,d:bd};
+}
+function bearingName(a,b){
+  var r=Math.PI/180,dLo=(b.lon-a.lon)*r,la1=a.lat*r,la2=b.lat*r;
+  var y=Math.sin(dLo)*Math.cos(la2),x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLo);
+  var th=(Math.atan2(y,x)/r+360)%360;
+  return ['N','NE','E','SE','S','SW','W','NW'][Math.round(th/45)%8];
+}
+function nearestPlace(la,lo){
+  var n=nearestTown(la,lo),dir=bearingName({lat:n.t[1],lon:n.t[2]},{lat:la,lon:lo});
+  return Math.max(1,Math.round(n.d))+' km '+dir+' of '+n.t[0]+', '+n.t[3];
+}
+function enrich(e){
+  var n=nearestTown(e.lat,e.lon);
+  e.town=n.t[0];e.dTown=n.d;
+  e.pan=n.t[4]!=='Costa Rica'&&n.d<=150;
+  e.prov=n.d<=150?n.t[4]:'Fuera de Panamá';
+}
+enrich(REF_MAIN);
+
+/* ---------- estado ---------- */
+var events=[],mainEvt=REF_MAIN,live=false,picked=null,lastOk=0;
+var S={onlyPA:true,magMin:0,period:'all',prov:'all',town:'all',sort:'recent',limit:20,base:'auto',zone:false,towns:false};
+
+function visible(){
+  var now=Date.now();
+  return events.filter(function(e){
+    if(S.onlyPA&&!e.pan)return false;
+    if(e.mag<S.magMin)return false;
+    if(S.period==='24'&&now-e.time>864e5)return false;
+    if(S.period==='6'&&now-e.time>216e5)return false;
+    if(S.prov!=='all'&&e.prov!==S.prov)return false;
+    if(S.town!=='all'&&e.town!==S.town)return false;
+    return true;
+  });
+}
+function isAfter(e){return e.id!==mainEvt.id&&e.time>mainEvt.time&&km(e,mainEvt)<=200}
+function detailUrl(e){
+  if(e.url)return e.url;
+  var ids=Object.keys(e.ids||{}).filter(function(i){return i.indexOf('e:')===0});
+  return ids.length?'https://www.seismicportal.eu/eventdetails.html?unid='+encodeURIComponent(ids[0].slice(2)):null;
+}
+
+/* ---------- mapa (Leaflet) ---------- */
+var map=null,baseLayer=null,evLayer=null,zoneLayer=null,townLayer=null;
+var LAND=[[-82.87,8.03],[-82.75,8.2],[-82.55,8.3],[-82.3,8.2],[-82.0,8.25],[-81.75,8.15],[-81.45,8.12],[-81.2,8.05],[-81.0,7.85],[-81.0,7.65],[-80.92,7.4],[-80.88,7.22],[-80.6,7.25],[-80.43,7.3],[-80.2,7.35],[-80.0,7.47],[-80.0,7.65],[-80.25,7.78],[-80.45,7.95],[-80.6,8.1],[-80.45,8.3],[-80.1,8.35],[-79.8,8.5],[-79.68,8.62],[-79.55,8.8],[-79.5,8.93],[-79.3,9.0],[-79.0,9.02],[-78.75,8.85],[-78.55,8.55],[-78.35,8.45],[-78.2,8.3],[-78.3,8.12],[-78.37,8.0],[-78.3,7.8],[-78.17,7.52],[-77.88,7.23],[-77.72,7.6],[-77.55,7.9],[-77.3,8.15],[-77.35,8.67],[-77.7,9.05],[-78.0,9.25],[-78.5,9.5],[-79.0,9.57],[-79.5,9.6],[-79.7,9.55],[-79.9,9.38],[-80.25,9.2],[-80.6,9.2],[-81.0,8.95],[-81.25,8.8],[-81.5,8.85],[-81.8,9.0],[-82.1,9.05],[-82.35,9.3],[-82.56,9.57],[-82.7,9.5],[-82.95,9.45],[-82.88,8.95],[-83.0,8.6]];
+function isDark(){var t=document.documentElement.getAttribute('data-theme');return t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches}
+function makeBase(name){
+  if(name==='osm')return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
+  if(name==='sat')return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Esri, Maxar, Earthstar Geographics'});
+  if(name==='vec')return L.polygon(LAND.map(function(p){return [p[1],p[0]]}),{color:cv('--land-line'),weight:1.5,fillColor:cv('--land'),fillOpacity:1,interactive:false});
+  return L.tileLayer('https://{s}.basemaps.cartocdn.com/'+(isDark()?'dark_all':'light_all')+'/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19,attribution:'© OpenStreetMap, © CARTO'});
+}
+function setBase(name){
+  S.base=name;
+  document.querySelectorAll('[data-base]').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-base')===name)});
+  if(!map)return;
+  if(baseLayer)map.removeLayer(baseLayer);
+  baseLayer=makeBase(name).addTo(map);
+  if(baseLayer.bringToBack)baseLayer.bringToBack();
+}
+function initMap(){
+  if(!window.L){$('map').innerHTML='<p class="hint" style="padding:16px">No se pudo cargar el mapa. Revisa tu conexión a internet.</p>';return;}
+  map=L.map('map',{preferCanvas:true,minZoom:5,maxZoom:15}).fitBounds(BOUNDS_ALL);
+  evLayer=L.layerGroup().addTo(map);
+  zoneLayer=L.layerGroup();townLayer=L.layerGroup();
+  TOWNS.forEach(function(t){
+    L.circleMarker([t[1],t[2]],{radius:3,color:cv('--fg'),weight:1,fillColor:cv('--fg'),fillOpacity:1,interactive:false})
+      .bindTooltip(t[0],{permanent:true,direction:'right',offset:[4,0],className:'townlbl'}).addTo(townLayer);
+  });
+  setBase(S.base);
+}
+function colorOf(m){return cv(magVar(m))}
+function drawMap(){
+  if(!map)return;
+  var now=Date.now(),bg=cv('--bg');
+  evLayer.clearLayers();
+  var list=visible().sort(function(a,b){return a.mag-b.mag});
+  list.forEach(function(e){
+    if(e.id===mainEvt.id)return;
+    var age=now-e.time,op=age<864e5?.92:age<2592e5?.7:.5,col=colorOf(e.mag);
+    var r=3+Math.pow(Math.max(e.mag,0),1.5)*0.9;
+    var m=L.circleMarker([e.lat,e.lon],{radius:r,color:bg,weight:.8,fillColor:col,fillOpacity:op});
+    m.on('click',function(){pick(e,false)});
+    m.addTo(evLayer);
+    if(age<600000){
+      L.marker([e.lat,e.lon],{interactive:false,icon:L.divIcon({className:'pulsepin',html:'<span style="border-color:'+col+'"></span>',iconSize:[0,0]})}).addTo(evLayer);
+    }
+  });
+  var mk=L.marker([mainEvt.lat,mainEvt.lon],{icon:L.divIcon({className:'',html:'<div class="mainpin">'+fmtMag(mainEvt.mag)+'</div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000});
+  mk.on('click',function(){pick(mainEvt,false)});
+  mk.addTo(evLayer);
+  if(picked&&picked.id!==mainEvt.id){
+    L.circleMarker([picked.lat,picked.lon],{radius:3+Math.pow(Math.max(picked.mag,0),1.5)*0.9+6,color:cv('--fg'),weight:2,fill:false,interactive:false}).addTo(evLayer);
+  }
+  zoneLayer.clearLayers();
+  L.circle([mainEvt.lat,mainEvt.lon],{radius:200000,color:cv('--m-major'),weight:1.5,dashArray:'6 6',fill:false,interactive:false}).addTo(zoneLayer);
+  if(S.zone&&!map.hasLayer(zoneLayer))zoneLayer.addTo(map);
+  if(!S.zone&&map.hasLayer(zoneLayer))map.removeLayer(zoneLayer);
+  if(S.towns&&!map.hasLayer(townLayer))townLayer.addTo(map);
+  if(!S.towns&&map.hasLayer(townLayer))map.removeLayer(townLayer);
+  $('mapCount').textContent=list.length+' eventos en el mapa';
+}
+function showPick(e){
+  var p=parsePlace(e.place);
+  $('pick').innerHTML='<b>M '+fmtMag(e.mag)+'</b> · '+esc(p.long)+' · '+fmtFull.format(e.time)+(e.depth!=null?' · prof. '+Math.round(e.depth)+' km':'')+' · '+ago(Date.now()-e.time)+(e.src?' · fuente '+esc(e.src):'');
+}
+function pick(e,fly){
+  picked=e;showPick(e);renderFocus();drawMap();
+  if(fly&&map){map.flyTo([e.lat,e.lon],Math.max(map.getZoom(),8),{duration:.8});$('mapa').scrollIntoView({block:'start'});}
+}
+
+/* ---------- panel general ---------- */
+function renderFocus(){
+  var pa=events.filter(function(e){return !S.onlyPA||e.pan});
+  var lastE=pa.slice().sort(function(a,b){return b.time-a.time})[0];
+  var f=picked||lastE||(live?null:mainEvt);
+  var el=$('focus');
+  if(!f){el.innerHTML='<p class="hint">Sin eventos con este filtro.</p>';return;}
+  var p=parsePlace(f.place),url=detailUrl(f);
+  el.innerHTML='<div class="bigmag mono" style="color:'+magColor(f.mag)+'">'+fmtMag(f.mag)+'</div>'
+    +'<div><div class="t">'+esc(p.long)+'</div><div class="hint">'+(picked?'Seleccionado':f===mainEvt&&!live?'Sismo principal (referencia)':'Evento más reciente')+' · '+ago(Date.now()-f.time)+'</div></div>'
+    +'<dl><div><dt>Fecha y hora</dt><dd>'+fmtFull.format(f.time)+' (UTC−5)</dd></div>'
+    +'<div><dt>Profundidad</dt><dd>'+(f.depth!=null?Math.round(f.depth)+' km':'—')+'</dd></div>'
+    +'<div><dt>Provincia (aprox.)</dt><dd>'+esc(f.prov||'—')+'</dd></div>'
+    +'<div><dt>Ciudad más cercana</dt><dd>'+esc(f.town||'—')+(f.dTown!=null?' · '+Math.round(f.dTown)+' km':'')+'</dd></div>'
+    +'<div><dt>Fuente</dt><dd>'+esc(f.src||'referencia')+'</dd></div></dl>'
+    +'<div class="links"><button type="button" class="btn-sec" id="seeMap">Ver en el mapa</button>'
+    +(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">Detalle en la fuente</a>':'')
+    +(picked?'<button type="button" class="btn-sec" id="unpick">Volver al más reciente</button>':'')+'</div>';
+  var sm=$('seeMap');if(sm)sm.onclick=function(){if(map)map.flyTo([f.lat,f.lon],Math.max(map.getZoom(),8),{duration:.8});$('mapa').scrollIntoView({block:'start'})};
+  var up=$('unpick');if(up)up.onclick=function(){picked=null;renderFocus();drawMap();$('pick').textContent='Toca un punto del mapa o un evento de la lista para ver el detalle.'};
+}
+function renderPanel(){
+  var now=Date.now();
+  var pa=events.filter(function(e){return !S.onlyPA||e.pan});
+  $('cEvents').textContent=events.length?pa.length:'–';
+  var big=pa.slice().sort(function(a,b){return b.mag-a.mag})[0];
+  $('cMaxM').textContent=big?'M '+fmtMag(big.mag):(live?'–':'M '+fmtMag(mainEvt.mag));
+  var lastE=pa.slice().sort(function(a,b){return b.time-a.time})[0];
+  $('cLast').textContent=lastE?fmtHour.format(lastE.time):'—';
+  $('cLastL').textContent=lastE?'evento más reciente · '+ago(now-lastE.time):'evento más reciente';
+  var after=events.filter(isAfter);
+  $('cAfter').textContent=events.length?after.length:'–';
+  $('c24').textContent=events.length?pa.filter(function(e){return now-e.time<864e5}).length:'–';
+  var bands=[['M 6.0 o más',function(m){return m>=6},'var(--m-major)'],['M 5.0–5.9',function(m){return m>=5&&m<6},'var(--m-high)'],['M 4.0–4.9',function(m){return m>=4&&m<5},'var(--m-mid)'],['Menos de M 4',function(m){return m<4},'var(--m-low)']];
+  var counts=bands.map(function(b){return after.filter(function(e){return b[1](e.mag)}).length});
+  var mx=Math.max.apply(null,counts.concat([1]));
+  $('bands').innerHTML=bands.map(function(b,i){return '<div class="band"><span class="mono">'+b[0]+'</span><div class="bar"><span style="width:'+(counts[i]/mx*100)+'%;background:'+b[2]+'"></span></div><span class="c mono">'+counts[i]+'</span></div>'}).join('');
+  var last24=after.filter(function(e){return now-e.time<864e5}).length,prev24=after.filter(function(e){var a=now-e.time;return a>=864e5&&a<1728e5}).length;
+  var rate='';
+  if(events.length){
+    rate=now-mainEvt.time>=1728e5?'Réplicas: '+last24+' en las últimas 24 h frente a '+prev24+' en las 24 h anteriores'+(last24<prev24?' (va bajando).':last24>prev24?' (subió).':' (igual).'):'Réplicas en las últimas 24 h: '+last24+'.';
+    rate+=' Con los días son menos frecuentes, pero una réplica fuerte sigue siendo posible.';
+  }
+  $('rate').textContent=rate;
+  var keys=[],t=mainEvt.time;
+  while(t<=now&&keys.length<15){var k=fmtDay.format(t);if(keys.indexOf(k)<0)keys.push(k);t+=864e5;}
+  var nk=fmtDay.format(now);if(keys.indexOf(nk)<0)keys.push(nk);
+  var bk={};keys.forEach(function(k){bk[k]=0});
+  after.forEach(function(e){var k=fmtDay.format(e.time);if(k in bk)bk[k]++});
+  var dm=Math.max.apply(null,keys.map(function(k){return bk[k]}).concat([1]));
+  $('days').innerHTML=keys.map(function(k){var q=k.split('-'),dt=Date.UTC(+q[0],+q[1]-1,+q[2],12);
+    return '<div class="day"><span class="v">'+bk[k]+'</span><div class="col" style="height:'+(bk[k]/dm*80)+'px"></div><span class="d">'+fmtDayShort.format(dt).replace('.','')+'</span></div>'}).join('');
+  renderFocus();
+}
+
+/* ---------- filtros y lista ---------- */
+function setOptions(sel,items,cur){
+  var key=JSON.stringify(items);
+  if(sel._k!==key){
+    sel._k=key;
+    sel.innerHTML='<option value="all">Todas</option>'+items.map(function(i){return '<option value="'+esc(i[0])+'">'+esc(i[1])+'</option>'}).join('');
+  }
+  sel.value=cur;
+  if(sel.value!==cur){sel.value='all';return false}
+  return true;
+}
+function buildFilters(){
+  var base=events.filter(function(e){return !S.onlyPA||e.pan});
+  var pc={};base.forEach(function(e){pc[e.prov]=(pc[e.prov]||0)+1});
+  var provs=Object.keys(pc).sort(function(a,b){return pc[b]-pc[a]}).map(function(p){return [p,p+' ('+pc[p]+')']});
+  if(!setOptions($('fProv'),provs,S.prov))S.prov='all';
+  var tc={};base.filter(function(e){return S.prov==='all'||e.prov===S.prov}).forEach(function(e){tc[e.town]=(tc[e.town]||0)+1});
+  var towns=Object.keys(tc).sort().map(function(t){return [t,t+' ('+tc[t]+')']});
+  if(!setOptions($('fTown'),towns,S.town))S.town='all';
+}
+function renderList(){
+  var now=Date.now(),v=visible();
+  v.sort(S.sort==='mag'?function(a,b){return b.mag-a.mag||b.time-a.time}:function(a,b){return b.time-a.time});
+  var show=v.slice(0,S.limit);
+  $('evCount').textContent=v.length+' eventos con los filtros del mapa';
+  $('list').innerHTML=show.length?show.map(function(e){
+    var p=parsePlace(e.place);
+    return '<button type="button" class="row" data-id="'+esc(e.id)+'"><span class="m" style="color:'+magColor(e.mag)+'">'+fmtMag(e.mag)+'</span><span class="p"><b>'+esc(p.long)+'</b><span>'+fmtFull.format(e.time)+' · '+ago(now-e.time)+(e.depth!=null?' · '+Math.round(e.depth)+' km prof.':'')+' · '+esc(e.prov||'')+'</span></span></button>';
+  }).join(''):'<p class="hint">'+(live?'Sin eventos con estos filtros.':'Sin datos todavía.')+'</p>';
+  $('more').hidden=v.length<=S.limit;
+}
+function renderAll(){buildFilters();renderPanel();renderList();drawMap();}
+
+$('list').addEventListener('click',function(ev){
+  var b=ev.target.closest('.row');if(!b)return;
+  var id=b.getAttribute('data-id'),e=events.filter(function(x){return x.id===id})[0];
+  if(e)pick(e,true);
+});
+$('more').onclick=function(){S.limit+=25;renderList();};
+$('sRecent').onclick=function(){S.sort='recent';$('sRecent').setAttribute('aria-pressed','true');$('sMag').setAttribute('aria-pressed','false');renderList();};
+$('sMag').onclick=function(){S.sort='mag';$('sMag').setAttribute('aria-pressed','true');$('sRecent').setAttribute('aria-pressed','false');renderList();};
+$('fMag').onchange=function(){S.magMin=+this.value;S.limit=20;renderAll();};
+$('fPer').onchange=function(){S.period=this.value;S.limit=20;renderAll();};
+$('fProv').onchange=function(){S.prov=this.value;S.town='all';S.limit=20;renderAll();};
+$('fTown').onchange=function(){S.town=this.value;S.limit=20;renderAll();};
+$('lZone').onchange=function(){S.zone=this.checked;drawMap();};
+$('lTowns').onchange=function(){S.towns=this.checked;drawMap();};
+$('onlyPA').checked=lsGet('onlyPA','1')==='1';S.onlyPA=$('onlyPA').checked;
+$('onlyPA').onchange=function(){S.onlyPA=this.checked;lsSet('onlyPA',this.checked?'1':'0');renderAll();};
+document.querySelectorAll('[data-base]').forEach(function(b){b.onclick=function(){setBase(this.getAttribute('data-base'))}});
+function setView(v){
+  $('vAll').setAttribute('aria-pressed',v==='all');$('vZone').setAttribute('aria-pressed',v==='zone');
+  if(map)map.fitBounds(v==='all'?BOUNDS_ALL:BOUNDS_ZONE);
+}
+$('vAll').onclick=function(){setView('all')};
+$('vZone').onclick=function(){setView('zone')};
+$('fs').onclick=function(){
+  var b=$('mapbox'),on=b.classList.toggle('full');
+  this.textContent=on?'Cerrar pantalla completa':'Pantalla completa';
+  document.body.style.overflow=on?'hidden':'';
+  if(map)setTimeout(function(){map.invalidateSize()},50);
+};
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&$('mapbox').classList.contains('full'))$('fs').click()});
+
+/* ---------- datos en vivo: USGS + EMSC (consulta periódica y WebSocket en tiempo real) ---------- */
+var alerted=[],firstLoad=true,okU=false,okE=false,wsOk=false,wsRetry=0,wsTimer=null,pending=0;
+try{alerted=JSON.parse(lsGet('alerted','[]'))||[]}catch(e){alerted=[]}
+var alertedSet={};alerted.forEach(function(i){alertedSet[i]=1});
+function inBox(la,lo){return la>=BOX.minlat&&la<=BOX.maxlat&&lo>=BOX.minlon&&lo<=BOX.maxlon}
+/* La primera consulta trae TODOS los sismos desde el 9 de octubre; las siguientes solo lo nuevo o corregido. */
+var usgsSince=0,emscSince=0,pollAt=0;
+function isoZ(t){return new Date(t).toISOString().slice(0,19)}
+function usgsUrl(){
+  var q={format:'geojson',starttime:START,minlatitude:BOX.minlat,maxlatitude:BOX.maxlat,minlongitude:BOX.minlon,maxlongitude:BOX.maxlon,minmagnitude:'0',orderby:'time',limit:'20000'};
+  if(usgsSince)q.updatedafter=isoZ(usgsSince-180000);
+  return API+'?'+new URLSearchParams(q).toString();
+}
+function emscUrl(){
+  var q={format:'json',starttime:START,minlatitude:BOX.minlat,maxlatitude:BOX.maxlat,minlongitude:BOX.minlon,maxlongitude:BOX.maxlon,orderby:'time',limit:'5000'};
+  if(emscSince)q.starttime=isoZ(Math.max(Date.parse(START+'Z'),Date.now()-36*36e5));
+  return EMSC_Q+'?'+new URLSearchParams(q).toString();
+}
+function normEmsc(f){
+  var p=f.properties||{},c=(f.geometry&&f.geometry.coordinates)||[];
+  var la=p.lat!=null?+p.lat:+c[1],lo=p.lon!=null?+p.lon:+c[0];
+  return {id:'e:'+(p.unid||f.id),src:'EMSC',mag:p.mag==null?null:parseFloat(p.mag),lat:la,lon:lo,depth:p.depth!=null?Math.abs(+p.depth):Math.abs(+c[2]||0),time:Date.parse(p.time),place:nearestPlace(la,lo)};
+}
+function same(a,b){return Math.abs(a.time-b.time)<=45000&&km(a,b)<=150&&Math.abs(a.mag-b.mag)<=1}
+/* une el mismo sismo reportado por varias fuentes; prefiere los datos del USGS */
+function upsert(n){
+  if(n.mag==null||isNaN(n.mag)||isNaN(n.time)||isNaN(n.lat)||isNaN(n.lon))return;
+  for(var i=0;i<events.length;i++){
+    var o=events[i];
+    if(o.ids[n.id]||same(o,n)){
+      o.ids[n.id]=1;o.srcs[n.src]=1;
+      if(n.src==='USGS'||!o.srcs.USGS){o.mag=n.mag;o.lat=n.lat;o.lon=n.lon;o.depth=n.depth;o.time=n.time;o.place=n.place;if(n.url)o.url=n.url;enrich(o);}
+      o.src=Object.keys(o.srcs).join('+');
+      return o;
+    }
+  }
+  n.ids={};n.ids[n.id]=1;n.srcs={};n.srcs[n.src]=1;n.src=n.src;
+  enrich(n);
+  events.push(n);
+  return n;
+}
+function fetchJson(u){
+  var ctrl=('AbortController' in window)?new AbortController():null;
+  var to=setTimeout(function(){if(ctrl)ctrl.abort()},20000);
+  return fetch(u,ctrl?{signal:ctrl.signal}:{}).then(function(r){clearTimeout(to);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()},function(e){clearTimeout(to);throw e});
+}
+function wasAlerted(e){return Object.keys(e.ids).some(function(i){return alertedSet[i]})}
+function markAlerted(e){Object.keys(e.ids).forEach(function(i){if(!alertedSet[i]){alertedSet[i]=1;alerted.push(i)}})}
+/* revisa qué sismos son nuevos, avisa solo del más fuerte del lote y redibuja */
+function finalize(){
+  var top=events.slice().sort(function(a,b){return b.mag-a.mag})[0];
+  if(top&&top.mag>=7)mainEvt=top;
+  var now=Date.now(),fresh=[];
+  events.forEach(function(e){
+    if(e.chk)return;
+    e.chk=true;
+    if(wasAlerted(e))return;
+    markAlerted(e);
+    if(e.id!==mainEvt.id&&e.pan&&e.mag>=thr()&&now-e.time<(firstLoad?600000:10800000))fresh.push(e);
+  });
+  if(alerted.length>800)alerted=alerted.slice(alerted.length-600);
+  lsSet('alerted',JSON.stringify(alerted));
+  if(fresh.length){fresh.sort(function(a,b){return b.mag-a.mag||b.time-a.time});raise(fresh[0],false);}
+  if(pending<=0)firstLoad=false;
+  if(picked){var p2=picked.id===mainEvt.id?mainEvt:events.filter(function(x){return x.id===picked.id})[0];if(p2)picked=p2;}
+  if(live){saveCache();syncCfg();}
+  setStatus();renderAll();
+}
+var tried=false;
+function pollDone(){pending--;if(pending<=0){tried=true;finalize();}}
+function poll(){
+  if(pending>0&&Date.now()-pollAt<25000)return;
+  pollAt=Date.now();pending=2;
+  var tU=Date.now(),tE=Date.now();
+  fetchJson(usgsUrl()).then(function(j){
+    (j.features||[]).forEach(function(f){var c=f.geometry.coordinates,p=f.properties;upsert({id:'u:'+f.id,src:'USGS',mag:p.mag,lat:c[1],lon:c[0],depth:c[2],time:p.time,place:p.place,url:p.url});});
+    okU=true;live=true;lastOk=Date.now();usgsSince=tU;
+  }).catch(function(){okU=false}).then(pollDone);
+  fetchJson(emscUrl()).then(function(j){
+    (j.features||[]).forEach(function(f){upsert(normEmsc(f));});
+    okE=true;live=true;lastOk=Date.now();emscSince=tE;
+  }).catch(function(){okE=false}).then(pollDone);
+}
+function connectWS(){
+  if(!('WebSocket' in window))return;
+  var sock;
+  try{sock=new WebSocket(EMSC_WS)}catch(e){return}
+  function dead(){
+    if(sock._d)return;sock._d=true;wsOk=false;setStatus();
+    clearTimeout(wsTimer);wsTimer=setTimeout(connectWS,Math.min(60000,5000*(++wsRetry)));
+  }
+  sock.onopen=function(){wsOk=true;wsRetry=0;setStatus()};
+  sock.onmessage=function(m){
+    try{
+      var j=JSON.parse(m.data),f=j&&j.data;
+      if(!f||!f.properties)return;
+      var e=normEmsc(f);
+      if(e.mag==null||!inBox(e.lat,e.lon)||e.time<Date.parse(START+'Z'))return;
+      upsert(e);okE=true;live=true;lastOk=Date.now();
+      finalize();
+    }catch(x){}
+  };
+  sock.onclose=dead;sock.onerror=dead;
+}
+function setStatus(){
+  var dot=$('dot'),t=$('statusTxt');
+  var recent=lastOk&&Date.now()-lastOk<POLL_MS*2.5;
+  var src=[okU?'USGS':null,okE?'EMSC':null].filter(Boolean).join(' + ');
+  if(live&&(recent||wsOk)){dot.className='dot live';t.textContent='En vivo · '+src+' · '+(wsOk?'tiempo real':'actualizado '+ago(Date.now()-lastOk));}
+  else if(live){dot.className='dot off';t.textContent='Sin conexión · último dato '+ago(Date.now()-lastOk);}
+  else if(!tried){dot.className='dot off';t.textContent='Conectando con USGS y EMSC…';}
+  else{dot.className='dot off';t.textContent='Sin conexión en vivo · copia guardada del USGS hasta el '+fmtFull.format(SNAP_LAST)+' · abre la página desde su enlace en Chrome o Safari';}
+}
+setInterval(setStatus,15000);
+setInterval(poll,POLL_MS);
+setInterval(function(){$('clock').textContent=fmtClock.format(Date.now())},1000);
+setInterval(renderPanel,60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden){poll();wake();syncCfg();}});
+$('refresh').onclick=function(){poll()};
+
+/* ---------- alertas: banner, notificación, silbidos de pajarito, voz ---------- */
+var armed=lsGet('armed','0')==='1',audioCtx=null,bannerTimer=null,pushOn=false,raised=[];
+var CALM='Mantén la calma. Agáchate, cúbrete y sujétate hasta que pare.';
+function thr(){return parseFloat($('thr').value)||4}
+function onlyPAnow(){return S.onlyPA}
+/* ajustes guardados: se recuperan solos */
+(function(){
+  var s=$('thr'),v=parseFloat(lsGet('thr','4.0'))||4,best=null,bd=99;
+  Array.prototype.forEach.call(s.options,function(o){var d=Math.abs(parseFloat(o.value)-v);if(d<bd){bd=d;best=o}});
+  if(best)s.value=best.value;
+})();
+$('thr').onchange=function(){lsSet('thr',this.value);pushSync();syncCfg();};
+$('voice').checked=lsGet('voice','1')==='1';
+$('voice').onchange=function(){lsSet('voice',this.checked?'1':'0')};
+
+function ensureAudio(){
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!audioCtx&&AC)audioCtx=new AC();
+    if(audioCtx&&audioCtx.state==='suspended'&&audioCtx.resume)audioCtx.resume();
+  }catch(e){}
+  return audioCtx;
+}
+/* con la alerta ya guardada, el primer toque en la página libera el sonido sin que haya que activar nada */
+['pointerdown','touchstart','keydown','click'].forEach(function(n){
+  window.addEventListener(n,function f(){if(armed)ensureAudio();window.removeEventListener(n,f,true)},true);
+});
+/* dos silbidos suaves y ligeros de pajarito; devuelve cuántos ms dura */
+function chirp(){
+  var ctx=ensureAudio();if(!ctx)return 0;
+  var t0=ctx.currentTime+0.03,end=t0;
+  for(var i=0;i<2;i++){
+    var st=t0+i*0.36,o=ctx.createOscillator(),g=ctx.createGain(),lf=ctx.createOscillator(),lg=ctx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(2400+i*150,st);
+    o.frequency.exponentialRampToValueAtTime(3500+i*150,st+0.15);
+    o.frequency.exponentialRampToValueAtTime(2950,st+0.28);
+    lf.frequency.value=26;lg.gain.value=55;lf.connect(lg);lg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001,st);
+    g.gain.exponentialRampToValueAtTime(0.2,st+0.07);
+    g.gain.exponentialRampToValueAtTime(0.0001,st+0.3);
+    o.connect(g);g.connect(ctx.destination);
+    o.start(st);lf.start(st);o.stop(st+0.32);lf.stop(st+0.32);
+    end=st+0.32;
+  }
+  return (end-ctx.currentTime)*1000;
+}
+function speak(text){
+  if(!('speechSynthesis' in window)||!$('voice').checked)return;
+  try{
+    window.speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    var vs=window.speechSynthesis.getVoices()||[];
+    var v=vs.filter(function(x){return /^es[-_]PA/i.test(x.lang)})[0]||vs.filter(function(x){return /^es[-_](419|MX|CO|US)/i.test(x.lang)})[0]||vs.filter(function(x){return /^es/i.test(x.lang)})[0];
+    if(v){u.voice=v;u.lang=v.lang}else u.lang='es-419';
+    u.rate=0.92;u.volume=1;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+function sysNotify(e,p,m){
+  try{
+    if(!('Notification' in window)||Notification.permission!=='granted'||!('serviceWorker' in navigator))return;
+    navigator.serviceWorker.ready.then(function(reg){
+      reg.showNotification('Sismo M '+m+' · '+p.short,{
+        body:CALM.replace(' hasta que pare','')+'\n'+p.long+' · '+fmtHour.format(e.time)+(e.depth!=null?' · prof. '+Math.round(e.depth)+' km':''),
+        icon:'icon-192.png',badge:'icon-192.png',tag:'sismo-alerta',renotify:true,vibrate:[200,100,200],
+        requireInteraction:e.mag>=5,lang:'es',timestamp:e.time,data:{url:'./#panel'}
+      });
+    });
+  }catch(x){}
+}
+function dupRaise(e){
+  var now=Date.now();
+  raised=raised.filter(function(r){return now-r.at<300000});
+  for(var i=0;i<raised.length;i++){var r=raised[i];if(Math.abs(r.time-e.time)<=90000&&km(r,e)<=150)return true}
+  raised.push({at:now,time:e.time,lat:e.lat,lon:e.lon});
+  return false;
+}
+/* e = sismo; isTest = prueba; fromPush = ya lo mostró el servidor de avisos, solo falta el sonido */
+function raise(e,isTest,fromPush){
+  if(!isTest&&dupRaise(e))return;
+  var p=parsePlace(e.place),m=fmtMag(e.mag);
+  var b=$('banner');
+  b.className=e.mag>=6?'major':e.mag<3.5?'low':'';
+  $('bMag').textContent=m;
+  $('bPlace').textContent=(isTest?'PRUEBA · ':'Sismo cerca de ')+p.short;
+  $('bInfo').textContent=p.long+' · '+fmtFull.format(e.time)+(e.depth!=null?' · prof. '+Math.round(e.depth)+' km':'');
+  $('bCalm').textContent=CALM;
+  b.hidden=false;
+  clearTimeout(bannerTimer);bannerTimer=setTimeout(function(){b.hidden=true},30000);
+  try{if(navigator.vibrate)navigator.vibrate([300,120,300])}catch(x){}
+  if(!armed)return;
+  var wait=chirp();
+  setTimeout(function(){speak((isTest?'Prueba. ':'')+'Sismo de magnitud '+m.replace('.',' punto ')+' cerca de '+p.short+'. Mantén la calma. Agáchate, cúbrete la cabeza y sujétate.')},wait+200);
+  if(!fromPush&&(isTest||!pushOn))sysNotify(e,p,m);
+}
+$('bClose').onclick=function(){$('banner').hidden=true;try{window.speechSynthesis.cancel()}catch(e){}};
+var wl=null;
+function wake(){
+  try{if(armed&&'wakeLock' in navigator&&!document.hidden){navigator.wakeLock.request('screen').then(function(l){wl=l}).catch(function(){})}}catch(e){}
+}
+
+/* ---------- avisos con la app cerrada (Web Push) ---------- */
+function b64u2buf(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';var r=atob(s),o=new Uint8Array(r.length);for(var i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
+function pushHint(t){var h=$('pushHint');if(h)h.textContent=t||''}
+function pushState(){
+  if(!armed){pushHint('');return}
+  if(!('Notification' in window)){pushHint('Este navegador no permite notificaciones. En iPhone, instala la app en la pantalla de inicio y ábrela desde ahí.');return}
+  if(Notification.permission==='denied'){pushHint('Las notificaciones están bloqueadas. Actívalas en los ajustes del sitio o de la app para ver los avisos arriba de la pantalla.');return}
+  if(Notification.permission!=='granted'){pushHint('Falta permitir las notificaciones para ver los avisos arriba de la pantalla.');return}
+  if(pushOn){pushHint('Avisos con la app cerrada: activos en este teléfono.');return}
+  if(!PUSH_URL){pushHint('Notificaciones activas con la app abierta. Para recibirlas también con la app cerrada falta conectar el servidor de avisos (ver LEEME.md).');return}
+  if(!('PushManager' in window)){pushHint('Para recibir avisos con la app cerrada, instala la app en la pantalla de inicio.');return}
+  pushHint('Conectando los avisos con la app cerrada…');
+}
+function pushApi(path,body){return fetch(PUSH_URL.replace(/\/+$/,'')+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+function pushSync(){
+  pushState();
+  if(!armed||!PUSH_URL||!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)||Notification.permission!=='granted')return;
+  navigator.serviceWorker.ready.then(function(reg){
+    return reg.pushManager.getSubscription().then(function(sub){return sub||reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u2buf(VAPID_PUB)})});
+  }).then(function(sub){
+    return pushApi('/subscribe',{sub:sub.toJSON(),thr:thr(),onlyPA:S.onlyPA}).then(function(r){pushOn=r.ok;pushState()});
+  }).catch(function(){pushOn=false;pushHint('No se pudo conectar el servidor de avisos; las notificaciones funcionan con la app abierta.')});
+}
+function pushStop(){
+  pushOn=false;
+  if(!PUSH_URL||!('serviceWorker' in navigator))return;
+  navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription()}).then(function(sub){if(sub)return pushApi('/unsubscribe',{sub:{endpoint:sub.endpoint}}).then(function(){return sub.unsubscribe()})}).catch(function(){});
+}
+/* copia de los ajustes para el service worker (revisión periódica de respaldo) */
+function syncCfg(){
+  try{
+    if(!window.caches)return;
+    var cut=Date.now()-6*36e5,seen=events.filter(function(e){return e.time>cut}).map(function(e){return Object.keys(e.ids)}).reduce(function(a,b){return a.concat(b)},[]).filter(function(i){return i.indexOf('u:')===0}).map(function(i){return i.slice(2)});
+    caches.open('sismos-cfg').then(function(c){return c.put('./cfg.json',new Response(JSON.stringify({armed:armed,thr:thr(),onlyPA:S.onlyPA,seen:live?seen:null})))}).catch(function(){});
+  }catch(e){}
+}
+function periodic(){
+  try{navigator.serviceWorker.ready.then(function(reg){if(reg.periodicSync)reg.periodicSync.register('sismos',{minInterval:15*60*1000}).catch(function(){})})}catch(e){}
+}
+function setArmUI(){
+  var b=$('arm');
+  b.setAttribute('aria-pressed',armed?'true':'false');
+  b.textContent=armed?'Alertas activas · tocar para pausar':'Activar alertas y voz';
+}
+$('arm').onclick=function(){
+  if(armed){
+    armed=false;lsSet('armed','0');setArmUI();pushStop();pushState();syncCfg();
+    try{if(wl)wl.release()}catch(e){}
+    return;
+  }
+  ensureAudio();
+  armed=true;lsSet('armed','1');setArmUI();
+  var w=chirp();
+  setTimeout(function(){speak('Alertas de sismos activadas. Mantén la calma, te avisaré.')},w+150);
+  wake();syncCfg();periodic();
+  var ask=('Notification' in window&&Notification.permission==='default')?Notification.requestPermission():Promise.resolve();
+  Promise.resolve(ask).then(function(){pushSync();pushState()},function(){pushState()});
+};
+$('test').onclick=function(){
+  ensureAudio();
+  var was=armed;armed=true;
+  var go=function(){
+    raise({id:'test',mag:5.3,lat:7.41,lon:-80.44,depth:10,time:Date.now(),place:'21 km N of Tonosí, Panama'},true);
+    armed=was;
+  };
+  if('Notification' in window&&Notification.permission==='default'){Notification.requestPermission().then(go,go)}else go();
+};
+/* mensaje del service worker: llegó un aviso mientras la app estaba abierta */
+try{if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',function(ev){
+  var m=ev.data;if(!m||m.type!=='quake'||!armed)return;var d=m.data||{};
+  if(d.mag==null||d.lat==null)return;
+  raise({id:d.id||'push',mag:d.mag,lat:d.lat,lon:d.lon,depth:d.depth,time:d.time||Date.now(),place:d.place||'Panamá'},false,true);
+})}catch(e){}
+
+/* ---------- instalar, difundir ---------- */
+var deferred=null;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;});
+$('install').onclick=function(){
+  var h=$('installHint');
+  if(deferred){deferred.prompt();deferred=null;return;}
+  h.hidden=false;
+  h.textContent='En iPhone: toca Compartir y luego “Añadir a pantalla de inicio”. En Android: abre el menú ⋮ del navegador y toca “Instalar app” o “Añadir a pantalla de inicio”.';
+};
+$('share').onclick=function(){
+  var h=$('installHint'),url=location.href.split('#')[0];
+  if(navigator.share){navigator.share({title:'Sismos Panamá',text:'Seguimiento de sismos y réplicas en Panamá',url:url}).catch(function(){});return;}
+  try{navigator.clipboard.writeText(url).then(function(){h.hidden=false;h.textContent='Enlace copiado.'},function(){h.hidden=false;h.textContent='Copia este enlace: '+url})}
+  catch(e){h.hidden=false;h.textContent='Copia este enlace: '+url}
+};
+
+/* ---------- guía por lugar y preparación ---------- */
+var GUIDE={
+  casa:['Agáchate y cúbrete bajo una mesa firme, o junto a una pared interior, lejos de vidrios.','Si estás en la cama, quédate ahí y protégete la cabeza con la almohada.','No salgas corriendo por las escaleras mientras tiembla.','Después, sal con calzado si la casa tiene daños y ve a un espacio abierto.'],
+  calle:['Aléjate de edificios, postes, cables y cornisas que puedan caer.','Ve a un espacio abierto y cúbrete la cabeza y el cuello.','No entres a edificios dañados.'],
+  vehiculo:['Detente en un lugar despejado, lejos de puentes, postes y cables.','Quédate dentro con el cinturón puesto hasta que pare.','Al continuar, avanza con cuidado: puede haber grietas o escombros en la vía.'],
+  costa:['Si el temblor es fuerte o largo, o no puedes mantenerte de pie, aléjate de la playa hacia terreno alto sin esperar un aviso.','Sube a pie siempre que puedas y evita ríos y desembocaduras.','Quédate arriba hasta que las autoridades indiquen que es seguro. Sigue a SINAPROC y a tsunami.gov.'],
+  ninos:['Mantén la calma y ayuda a los niños a agacharse y cubrirse la cabeza.','Si usas silla de ruedas, frena las ruedas, agáchate y cúbrete la cabeza y el cuello.','Practica simulacros en casa para que todos sepan qué hacer.']
+};
+function showGuide(k){
+  document.querySelectorAll('#placeTabs button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-p')===k)});
+  $('guide').innerHTML='<ul>'+GUIDE[k].map(function(t){return '<li>'+t+'</li>'}).join('')+'</ul>';
+}
+document.querySelectorAll('#placeTabs button').forEach(function(b){b.onclick=function(){showGuide(this.getAttribute('data-p'))}});
+showGuide('casa');
+var CHECKS=['Mochila de emergencia con agua para 3 días, comida no perecedera, botiquín y linterna','Plan familiar: punto de encuentro y contactos de emergencia anotados en papel','Conozco las rutas de salida y las zonas altas cercanas a mi casa o trabajo','Muebles pesados, estantes y televisores asegurados a la pared','Radio con baterías, cargador portátil y copias de documentos importantes','Sé cerrar la llave del gas y cortar la electricidad','Medicinas de uso diario para varios días y una lista de mis alergias'];
+CHECKS=CHECKS.slice(0,6);
+var chk={};try{chk=JSON.parse(lsGet('checks','{}'))||{}}catch(e){chk={}}
+$('checks').innerHTML=CHECKS.map(function(t,i){return '<label for="ck'+i+'"><input type="checkbox" id="ck'+i+'" data-i="'+i+'"'+(chk[i]?' checked':'')+'><span>'+t+'</span></label>'}).join('');
+function prog(){var n=CHECKS.filter(function(_,i){return chk[i]}).length;$('prog').textContent=n+' de '+CHECKS.length+' listas';$('progBar').style.width=(n/CHECKS.length*100)+'%';}
+$('checks').addEventListener('change',function(e){var i=e.target.getAttribute('data-i');if(i===null)return;chk[i]=e.target.checked;lsSet('checks',JSON.stringify(chk));prog();});
+prog();
+
+/* ---------- navegación: sección activa ---------- */
+try{(function(){
+  var links={};document.querySelectorAll('nav a[data-sec]').forEach(function(a){links[a.getAttribute('data-sec')]=a});
+  if(!('IntersectionObserver' in window))return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(en){if(en.isIntersecting){Object.keys(links).forEach(function(k){links[k].removeAttribute('aria-current')});var a=links[en.target.id];if(a){a.setAttribute('aria-current','true');if(a.scrollIntoView&&window.innerWidth<900)a.scrollIntoView({block:'nearest',inline:'center'})}}});
+  },{rootMargin:'-20% 0px -70% 0px'});
+  Object.keys(links).forEach(function(k){var s=$(k);if(s)io.observe(s)});
+})();}catch(e){}
+
+/* ---------- copia guardada: sismos del USGS del 9 al 12 de octubre de 2026 (id, hora UTC, magnitud, lat, lon, profundidad km, lugar) ---------- */
+var SNAP=[["us6000u18k","2026-10-09T17:56:06Z",7.7,7.5868,-80.769,12.647,"12 km WSW of Pitaloza Arriba, Panama"],["us6000u18t","2026-10-09T18:22:15Z",5.5,7.586,-80.2885,10.0,"3 km SW of Bajo Corral, Panama"],["us6000u18x","2026-10-09T18:37:46Z",5.8,7.4362,-80.4012,10.0,"1 km S of El Cacao, Panama"],["us6000u195","2026-10-09T18:47:04Z",5.0,7.5783,-81.0943,10.0,"19 km S of Leones Arriba, Panama"],["us6000u194","2026-10-09T18:50:12Z",5.0,7.3504,-80.1178,10.0,"18 km S of Los Asientos, Panama"],["us6000u197","2026-10-09T19:04:49Z",5.0,7.6161,-81.2492,10.0,"14 km SE of Río Grande, Panama"],["us6000u198","2026-10-09T19:17:22Z",4.8,7.6086,-81.0415,25.962,"14 km SSW of Tebario, Panama"],["us6000u19c","2026-10-09T19:32:19Z",4.7,7.5147,-80.5899,10.0,"8 km N of La Tronosa, Panama"],["us6000u19e","2026-10-09T19:42:50Z",4.5,7.5554,-80.2145,10.0,"5 km N of Oria Arriba, Panama"],["us6000u19i","2026-10-09T19:45:58Z",4.8,7.5448,-80.1336,10.0,"2 km N of Los Asientos, Panama"],["us6000u19h","2026-10-09T19:48:55Z",5.2,7.6417,-81.2677,10.0,"11 km SE of Río Grande, Panama"],["us6000u19s","2026-10-09T20:20:23Z",4.9,7.6169,-81.0268,10.0,"12 km SSW of Tebario, Panama"],["us6000u19t","2026-10-09T20:21:37Z",5.0,7.4734,-80.5491,10.0,"6 km NE of La Tronosa, Panama"],["us6000u19w","2026-10-09T20:25:39Z",6.6,7.7176,-81.4687,10.0,"14 km W of Río Grande, Panama"],["us6000u1a5","2026-10-09T20:41:04Z",4.9,7.6771,-81.0923,10.0,"8 km SSE of Leones Arriba, Panama"],["us6000u1aa","2026-10-09T20:42:08Z",5.0,7.7249,-81.4589,10.0,"13 km W of Río Grande, Panama"],["us6000u1a6","2026-10-09T20:54:56Z",4.9,7.8349,-81.467,10.0,"16 km SSW of Calidonia, Panama"],["us6000u1a9","2026-10-09T21:05:25Z",4.9,7.7299,-81.452,10.0,"13 km W of Río Grande, Panama"],["us6000u1ai","2026-10-09T21:47:49Z",4.6,7.7551,-81.319,10.0,"4 km NNE of Río Grande, Panama"],["us6000u1ax","2026-10-09T23:10:02Z",5.0,7.3962,-80.5284,10.0,"8 km ESE of La Tronosa, Panama"],["us6000u1ay","2026-10-09T23:12:37Z",5.4,7.4366,-80.0968,10.0,"9 km SSE of Los Asientos, Panama"],["us6000u1az","2026-10-09T23:23:13Z",4.9,7.6651,-81.4005,10.0,"9 km SW of Río Grande, Panama"],["us6000u1b3","2026-10-09T23:54:22Z",4.5,7.1444,-79.8903,10.0,"45 km SSE of Pedasí, Panama"],["us6000u1b4","2026-10-09T23:57:38Z",4.7,7.7378,-81.4599,10.0,"14 km W of Río Grande, Panama"],["us6000u1b5","2026-10-10T00:03:04Z",4.8,7.4053,-80.2957,10.0,"5 km SW of Cañas, Panama"],["us6000u1bg","2026-10-10T00:45:20Z",4.0,7.5127,-80.0092,10.0,"2 km SE of Pedasí, Panama"],["us6000u1bj","2026-10-10T00:51:48Z",4.6,7.5164,-80.5568,10.0,"9 km NNE of La Tronosa, Panama"],["us6000u1bl","2026-10-10T01:11:47Z",4.7,7.5302,-80.5858,10.0,"10 km N of La Tronosa, Panama"],["us6000u1bp","2026-10-10T01:35:47Z",4.6,7.6272,-81.3237,10.0,"10 km S of Río Grande, Panama"],["us6000u1bu","2026-10-10T02:26:32Z",5.1,7.4178,-80.4348,10.0,"1 km NNE of Tonosí, Panama"],["us6000u1bw","2026-10-10T02:43:38Z",4.5,7.5746,-81.2493,10.0,"18 km SSE of Río Grande, Panama"],["us6000u1cb","2026-10-10T03:56:17Z",4.7,7.5141,-80.5849,10.0,"8 km N of La Tronosa, Panama"],["us6000u1cf","2026-10-10T04:14:01Z",6.0,7.5068,-80.5985,10.0,"7 km N of La Tronosa, Panama"],["us6000u1ck","2026-10-10T04:33:03Z",4.5,7.5239,-80.4791,10.0,"9 km WNW of Flores, Panama"],["us6000u1cs","2026-10-10T05:21:07Z",4.4,7.5274,-81.3734,10.0,"21 km SSW of Río Grande, Panama"],["us6000u1cz","2026-10-10T06:04:20Z",4.3,7.7715,-80.9764,10.0,"5 km N of Tebario, Panama"],["us6000u1d1","2026-10-10T06:16:32Z",4.5,7.3167,-79.9478,10.0,"25 km SSE of Pedasí, Panama"],["us6000u1d2","2026-10-10T06:18:55Z",4.9,7.3663,-80.3171,10.0,"10 km SSW of Cañas, Panama"],["us6000u1d5","2026-10-10T06:27:09Z",4.7,7.2969,-79.9827,10.0,"26 km S of Pedasí, Panama"],["us6000u1d7","2026-10-10T06:30:03Z",4.9,7.2997,-79.9687,10.0,"26 km SSE of Pedasí, Panama"],["us6000u1db","2026-10-10T06:47:49Z",4.5,7.4558,-79.9613,10.0,"10 km SE of Pedasí, Panama"],["us6000u1dc","2026-10-10T07:13:30Z",4.6,7.6182,-80.5348,10.0,"6 km SSE of Llano de Piedra, Panama"],["us6000u1df","2026-10-10T07:24:35Z",4.4,7.6534,-80.5839,10.0,"2 km WSW of Llano de Piedra, Panama"],["us6000u1dx","2026-10-10T09:48:18Z",4.2,7.3754,-80.0853,10.0,"16 km SSE of Los Asientos, Panama"],["us6000u1e5","2026-10-10T10:35:11Z",4.8,7.7463,-81.3092,10.0,"4 km NE of Río Grande, Panama"],["us6000u1em","2026-10-10T12:34:08Z",4.3,7.689,-80.9902,10.0,"3 km SSW of Tebario, Panama"],["us6000u1ev","2026-10-10T13:22:13Z",4.5,7.5481,-80.166,10.0,"4 km NW of Los Asientos, Panama"],["us6000u1ex","2026-10-10T13:46:56Z",4.8,7.5187,-80.5165,10.0,"12 km NE of La Tronosa, Panama"],["us6000u1f3","2026-10-10T14:51:45Z",4.5,7.5178,-80.6744,10.0,"10 km NNW of El Cortezo, Panama"],["us6000u1f6","2026-10-10T14:59:23Z",4.5,7.8256,-81.3036,10.0,"5 km WNW of Guarumal, Panama"],["us6000u1fj","2026-10-10T15:58:19Z",4.8,7.6231,-81.0112,10.0,"11 km SSW of Tebario, Panama"],["us6000u1fk","2026-10-10T16:05:42Z",4.7,7.4596,-80.4282,13.518,"2 km WNW of El Cacao, Panama"],["us6000u1hj","2026-10-11T00:06:09Z",4.6,7.8093,-81.472,10.0,"18 km WNW of Río Grande, Panama"],["us6000u1hw","2026-10-11T01:50:52Z",5.0,7.5139,-80.4283,10.0,"3 km NW of Flores, Panama"],["us6000u1i9","2026-10-11T03:18:14Z",4.4,7.6705,-80.6908,10.0,"3 km NW of Pitaloza Arriba, Panama"],["us6000u1lf","2026-10-11T17:11:29Z",4.8,7.7084,-81.6209,10.0,"31 km W of Río Grande, Panama"],["us6000u1lp","2026-10-11T18:29:45Z",4.4,7.6596,-81.0353,10.0,"9 km SW of Tebario, Panama"],["us6000u1me","2026-10-11T21:19:20Z",4.5,7.7202,-81.5862,10.0,"27 km W of Río Grande, Panama"],["us6000u1my","2026-10-11T22:25:36Z",4.4,7.6721,-81.4949,10.0,"18 km WSW of Río Grande, Panama"],["us6000u1mz","2026-10-11T22:40:24Z",4.6,7.7569,-81.1135,10.0,"0 km NE of Leones Arriba, Panama"],["us6000u1ny","2026-10-12T02:22:29Z",4.5,7.6112,-80.0698,10.0,"7 km ENE of Lajamina, Panama"],["us6000u1pf","2026-10-12T04:15:02Z",4.2,7.5974,-80.5351,10.0,"8 km SSE of Llano de Piedra, Panama"],["us6000u1qd","2026-10-12T07:16:06Z",4.5,7.6987,-80.9143,10.0,"7 km ESE of Tebario, Panama"],["us6000u1re","2026-10-12T11:07:27Z",4.3,7.4832,-80.646,10.0,"6 km NNW of El Cortezo, Panama"],["us6000u1rx","2026-10-12T13:17:18Z",4.5,7.3997,-80.4946,10.0,"6 km W of Tonosí, Panama"],["us6000u1vf","2026-10-12T20:05:25Z",4.8,7.7181,-81.5677,10.0,"25 km W of Río Grande, Panama"],["us6000u1w6","2026-10-12T21:43:30Z",4.5,7.8231,-81.5024,10.0,"19 km SW of Calidonia, Panama"],["us6000u1w7","2026-10-12T21:48:54Z",4.5,7.9307,-81.445,10.0,"7 km WSW of Calidonia, Panama"],["us6000u1wn","2026-10-12T23:20:36Z",6.1,7.7028,-81.4989,10.0,"18 km W of Río Grande, Panama"],["us6000u1ww","2026-10-12T23:36:46Z",4.8,7.7361,-81.5274,10.0,"21 km W of Río Grande, Panama"]];
+var SNAP_LAST=0;
+SNAP.forEach(function(r){
+  var e=upsert({id:'u:'+r[0],src:'USGS',mag:r[2],lat:r[3],lon:r[4],depth:r[5],time:Date.parse(r[1]),place:r[6],url:'https://earthquake.usgs.gov/earthquakes/eventpage/'+r[0]});
+  if(e){e.chk=true;if(e.time>SNAP_LAST)SNAP_LAST=e.time;}
+});
+(function(){var top=events.slice().sort(function(a,b){return b.mag-a.mag})[0];if(top&&top.mag>=7)mainEvt=top;})();
+
+/* ---------- copia local: al entrar ya ve todos los sismos conocidos, aunque no haya conexión ---------- */
+function saveCache(){
+  try{
+    var rows=events.map(function(e){return [Object.keys(e.ids),Object.keys(e.srcs),e.mag,e.lat,e.lon,e.depth,e.time,e.place,e.url||0]});
+    lsSet('evcache',JSON.stringify(rows));
+  }catch(x){}
+}
+(function(){
+  var raw;try{raw=JSON.parse(lsGet('evcache','[]'))||[]}catch(e){return}
+  raw.forEach(function(r){
+    var pri=r[1].indexOf('USGS')>=0?'USGS':'EMSC';
+    var idp=r[0].filter(function(i){return pri==='USGS'?i.indexOf('u:')===0:i.indexOf('e:')===0})[0]||r[0][0];
+    var e=upsert({id:idp,src:pri,mag:r[2],lat:r[3],lon:r[4],depth:r[5],time:r[6],place:r[7],url:r[8]||undefined});
+    if(e){r[0].forEach(function(i){e.ids[i]=1});r[1].forEach(function(x){e.srcs[x]=1});e.src=Object.keys(e.srcs).join('+');e.chk=true;if(e.time>SNAP_LAST)SNAP_LAST=e.time;}
+  });
+  var top=events.slice().sort(function(a,b){return b.mag-a.mag})[0];if(top&&top.mag>=7)mainEvt=top;
+})();
+
+/* ---------- arranque ---------- */
+$('clock').textContent=fmtClock.format(Date.now());
+try{if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(function(){});}catch(e){}
+try{initMap();}catch(e){map=null;}
+try{renderAll();}catch(e){}
+setArmUI();pushState();
+if(armed){periodic();if('Notification' in window&&Notification.permission==='granted')pushSync();}
+setStatus();poll();connectWS();
+})();
+</script>
+</body>
+</html>
